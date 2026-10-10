@@ -19,7 +19,7 @@ from PIL import Image
 
 # 车手/分站/胎色共享字典：与 f1_chart_q.py / f1_chart_r.py 同源，改字典改 f1_dict.py 一处
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from f1_dict import DRIVERS, CN, tire_color, resolve_session, load_json
+from f1_dict import DRIVERS, CN, tire_color, resolve_session, load_json, live_drivers
 from f1_i18n import add_lang_arg, init, t, tire_short, is_zh
 
 DEFAULT_SESSION_KEY = 11363   # 无参数时的兜底场次（马德里 FP2）；常规用法是传 session_key
@@ -61,6 +61,7 @@ for _k in META["missing"]:
 
 laps = load_json(DATA_DIR, PREFIX, "laps")
 stints = load_json(DATA_DIR, PREFIX, "stints")
+DRV = live_drivers(DATA_DIR, PREFIX)
 
 clean = []
 for L in laps:
@@ -85,7 +86,7 @@ def tire_for(drv, ln):
 
 rows = []
 for n, b in best.items():
-    d = DRIVERS.get(n, {"last":f"#{n}","team":"Unknown","color":"888888","full":f"#{n}"})
+    d = DRV.get(n, {"last":f"#{n}","team":"Unknown","color":"888888","full":f"#{n}"})
     rows.append({"num":n,"name":d["last"],"team":d["team"],"color":d["color"],"full":d["full"],"cn":CN.get(n,d["last"]),"best":b,"laps":total_laps.get(n,0),"tire":tire_for(n, best_lap.get(n,0))})
 rows.sort(key=lambda r: r["best"])
 gap0 = rows[0]["best"]

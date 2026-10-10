@@ -20,6 +20,7 @@ DRIVERS = {
     1:  {"last": "Norris",     "abbr": "NOR", "full": "Lando NORRIS",     "team": "McLaren",        "color": "F47600", "cn": "诺里斯"},
     3:  {"last": "Verstappen", "abbr": "VER", "full": "Max VERSTAPPEN",   "team": "Red Bull Racing", "color": "4781D7", "cn": "维斯塔潘"},
     5:  {"last": "Bortoleto",  "abbr": "BOR", "full": "Gabriel BORTOLETO", "team": "Audi",         "color": "F50537", "cn": "博尔托雷托"},
+    6:  {"last": "Hadjar",     "abbr": "HAD", "full": "Isack HADJAR",       "team": "Red Bull Racing", "color": "4781D7", "cn": "哈贾尔"},
     10: {"last": "Gasly",      "abbr": "GAS", "full": "Pierre GASLY",     "team": "Alpine",        "color": "00A1E8", "cn": "加斯利"},
     11: {"last": "Perez",      "abbr": "PER", "full": "Sergio PEREZ",     "team": "Cadillac",      "color": "909090", "cn": "佩雷兹"},
     12: {"last": "Antonelli",  "abbr": "ANT", "full": "Kimi ANTONELLI",   "team": "Mercedes",      "color": "00D7B6", "cn": "安东内利"},
@@ -222,3 +223,24 @@ def resolve_session(data_dir, prefix, args=None, lang="zh"):
             "stage": stage, "stage_zh": stage_zh, "stage_label": stage_label,
             "date_label": date_label, "gp_name": gp_name,
             "fig_name": ov("fig_name") or "", "missing": missing}
+
+
+def live_drivers(data_dir, prefix):
+    raw = load_json(data_dir, prefix, "drivers")
+    if not raw:
+        return dict(DRIVERS)
+    out = {}
+    for d in raw:
+        num = d.get("driver_number")
+        if num is None:
+            continue
+        full = d.get("full_name") or ""
+        last = full.split()[-1].title() if full else (d.get("broadcast_name") or ("#" + str(num)))
+        out[num] = {
+            "last": last,
+            "team": d.get("team_name") or "Unknown",
+            "color": d.get("team_colour") or "888888",
+            "full": full,
+            "cn": CN.get(num, ""),
+        }
+    return out

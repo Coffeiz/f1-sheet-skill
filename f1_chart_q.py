@@ -24,7 +24,7 @@ from PIL import Image
 
 # 车手/分站/胎色共享字典：与 f1_chart_fp.py / f1_chart_r.py 同源，改字典改 f1_dict.py 一处
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from f1_dict import DRIVERS, CN, resolve_session, load_json
+from f1_dict import DRIVERS, CN, resolve_session, load_json, live_drivers
 from f1_i18n import add_lang_arg, init, t, is_zh
 
 DEFAULT_SESSION_KEY = 11357   # 无参数时的兜底场次（蒙扎排位赛）；常规用法是传 session_key
@@ -75,6 +75,8 @@ STAGE_TXT = {2: "#170f26", 1: "#0b1420", 0: "#f2f4f8"}
 
 
 def fmt_time(t):
+    if t is None:
+        return "—"
     m = int(t // 60)
     return f"{m}:{t - 60 * m:06.3f}"
 
@@ -85,6 +87,7 @@ def hx(c):
 # ---------- 数据 ----------
 RESULT = load_json(DATA_DIR, PREFIX, "result")
 DRV_LIST = load_json(DATA_DIR, PREFIX, "drivers")
+DRIVERS = live_drivers(DATA_DIR, PREFIX)
 
 
 def stage_of(pos):
@@ -103,7 +106,9 @@ for r in RESULT:
 
 rows = []
 for r in RESULT:
-    pos = int(r.get("position") or 99)
+    _p = r.get("position")
+    is_rt = not str(_p).isdigit()
+    pos = int(_p) if not is_rt else 99
     num = r["driver_number"]
     d = DRIVERS.get(num, {"last": f"#{num}", "team": "Unknown", "color": "888888", "full": f"#{num}"})
     dur = list(r.get("duration") or [])
@@ -115,7 +120,7 @@ for r in RESULT:
         "pos": pos, "num": num, "name": d["last"], "cn": CN.get(num, ""),
         "team": d["team"], "color": d["color"], "full": d["full"],
         "q1": dur[0], "q2": dur[1], "q3": dur[2],
-        "stage": st, "best": best, "out": pos > 10,
+        "stage": st, "best": best, "out": pos > 10, "rt": is_rt, "pos_label": ("RT" if is_rt else "P" + str(pos))
     })
 rows.sort(key=lambda r: r["pos"])
 for r in rows:
@@ -186,7 +191,7 @@ for i, r in enumerate(rows):
         p.append(f'<rect x="24" y="{y-10}" width="{W-48}" height="{ROW_H}" fill="#ffffff" fill-opacity="0.022"/>')
     out = r["out"]
     pos_col = "#C77DFF" if i == 0 else ("#4f586b" if out else "#77839a")
-    p.append(f'<text x="34" y="{y+8.5}" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="{pos_col}" font-weight="700">P{r["pos"]}</text>')
+    p.append(f'<text x="34" y="{y+8.5}" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="12.5" fill="{pos_col}" font-weight="700">{r["pos_label"]}</text>')
     name_col = "#98a3b5" if out else "#eef1f6"
     p.append(f'<text x="88" y="{y+8.5}" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="13.5" fill="{name_col}" font-weight="600">{r["name"]}</text>')
     if r["cn"] and is_zh():
@@ -202,7 +207,8 @@ for i, r in enumerate(rows):
         p.append(f'<rect x="{_bx:.1f}" y="{y-4}" width="56" height="16" rx="8" fill="#C77DFF"/>')
         p.append(f'<text x="{_bx+28:.1f}" y="{y+7.4}" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="9.5" fill="#170f26" font-weight="800" text-anchor="middle">POLE</text>')
     else:
-        p.append(f'<text x="{PLOT_X0 + bw + 19:.1f}" y="{y+8.5}" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11" fill="#e8ecf3" font-weight="600">+{r["gap"]:.3f}</text>')
+        _gtxt = ("+" + format(r["gap"], ".3f")) if r["gap"] is not None else "—"
+        p.append(f'<text x="{PLOT_X0 + bw + 19:.1f}" y="{y+8.5}" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11" fill="#e8ecf3" font-weight="600">{_gtxt}</text>')
     # 右侧：时间 + 阶段微章
     p.append(f'<text x="{TIME_X}" y="{y+8.5}" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="{"#98a3b5" if out else "#dbe2ec"}" font-weight="600">{fmt_time(r["best"])}</text>')
     st = r["stage"]
@@ -272,4 +278,4 @@ print(f"[3/3] done: {LIB_DIR}/", file=sys.stderr)
 
 print(f"POLE: P1 {rows[0]['name']} {fmt_time(pole)} ({rows[0]['team']})", file=sys.stderr)
 for i, r in enumerate(rows):
-    print(f"  P{r['pos']:<3} #{r['num']:<3} {r['name']:<12} {r['cn']:<6} {STAGE_NAME[r['stage']]} {fmt_time(r['best'])} +{r['gap']:.3f}", file=sys.stderr)
+    print(f"  P{r['pos']:<3} #{r['num']:<3} {r['name']:<12} {r['cn']:<6} {STAGE_NAME[r['stage']]} {fmt_time(r['best'])} +{('%.3f' % r['gap']) if r['gap'] is not None else '-'}", file=sys.stderr)
