@@ -13,18 +13,62 @@ description: 用 OpenF1 公开数据出 F1 数据图——FP/排位/正赛圈速
 - 用户问某站谁单圈最快、排位差距多大、长跑谁快/怎么掉速
 - 用户要一整个比赛周末的图
 
+## ⛔ 出图前强制三查（每次出图都必须走）
+
+2026-10-17 踩过：拿 `data/` 里「看起来最新」的 session_key=11731 当成新加坡正赛，实际那是 **巴林大奖赛在马来西亚**（meeting_key 1308，10/2–10/4，Kuala Lumpur 赛道），出图时又忘传 `--station`，直接套字典默认值落进错误目录名。数据错、站名也错。
+
+### 查一：session_key 到底是哪一场（必须回 OpenF1 核 meeting）
+
+`data/` 里会同时存在**两套互不相邻的 session_key**，按「最大/最新」判断必错。本地已知的两套：
+
+| session_key | meeting | 实际是什么 |
+| --- | --- | --- |
+| 11378 / 11379 / 11383 / 11384 / 11388 | 1296 | 新加坡（Marina Bay，10/9–10/11） |
+| 11727 / 11728 / 11729 / 11730 / 11731 | 1308 | 巴林大奖赛**在马来西亚**（Kuala Lumpur，10/2–10/4） |
+
+核法二选一：
+```bash
+python3 f1_fetch.py --sessions 2026                    # 走脚本，会同时打出 station/日期
+curl -s "https://api.openf1.org/v1/sessions?meeting_key=<MEETING_KEY>"
+# 或看本地 data/s<key>_session.json 的 meeting_key，再去查
+curl -s "https://api.openf1.org/v1/meetings?year=2026"
+```
+
+**判定标准**：站名、日期、赛道三项必须和用户要的那场全部对上才准往下走。对不上就停下报给用户，不要猜、不要拿「最接近的那场」顶替。
+
+### 查二：目标站目录里是否已有产物
+
+```bash
+ls -la charts/ && ls -la "charts/<赛季>-R<站序>-<站名>/"
+```
+- 该站该阶段已有同名图 → **先问用户**是覆盖还是另开 `_历史` 目录，别默认覆盖。
+- 发现同站有中英文双目录（历史 bug 遗留）→ 先确认再合并，别自己删。
+
+### 查三：数据完整性（`session_result` 在不在）
+
+```bash
+ls data/s<key>_*.json
+```
+- 正赛图 `f1_chart_r.py` 依赖 `s<key>_session_result.json`；缺这个文件就是没抓完，先跑 `f1_fetch.py <key>`，不要硬跑。
+- 退赛车手的 `position` 可能是 `null`、`gap_to_leader` 可能是 `'DNF'` / `'+1 LAP'` 这类字符串，脚本和口播都按真实形态处理，**别脑补成 P20/P21/P22 或补 0 分**。
+
+### 附带记住的两条
+
+- **`resolve_session()` 对 2026 赛季实际失效**：OpenF1 `session` 端点的 `meeting_name` 是空的、`location` 与 `country_name` 错配。所以 `--station / --round / --gp-name / --date` 必须**显式手传**，不要依赖自动推断。
+- **沙盒里发图**：`send_file` 只认文件库 `file_id`，不认沙盒物理路径。跑完先 `list_dir` 查 `file_id` 再发；直接填 `/workspace/default/...` 会报「未找到文件」。
+
 ## 三步流程
 
 ```bash
-# 1. 先确认站序和场次号
+# 1. 先确认站序和场次号（这一步同时完成上面的查一）
 python3 f1_fetch.py --rounds 2026      # 分站明细 + 该站是第几站
 python3 f1_fetch.py --sessions 2026    # 本赛季全部 session 清单（拿 session_key）
 
 # 2. 抓数据（默认抓 laps stints position result drivers session）
 python3 f1_fetch.py <session_key>      # → data/s<session_key>_*.json
 
-# 3. 出图
-python3 f1_chart_fp.py <session_key>   # → charts/<赛季>-R<站序>-<分站>/<图名>.png
+# 3. 出图（记得带 --station / --round / --gp-name / --date，见查三的提醒）
+python3 f1_chart_fp.py <session_key> --station 新加坡 --round 19 --gp-name 新加坡大奖赛 --date 2026-10-11
 ```
 
 懒人版（抓数 + 出图一把梭）：
@@ -84,13 +128,13 @@ python3 f1_weekend.py --round 16 --refetch     # 已有数据也重抓
 | `--station` / `--round` / `--gp-name` / `--date` / `--fig-name` | 覆盖自动推断的站名 / 站序 / 大奖赛名 / 日期 / 图名 |
 | `--lang` | 图内文案语言 `zh`/`en`，不给就按 locale 自动判（见「语言」一节） |
 
-后面几个一般不传，`f1_dict.resolve_session()` 会从 session 数据自动推出来，推不出来会打告警，这时再手动覆盖。
+后面几个**在 2026 赛季必须显式传**——`f1_dict.resolve_session()` 对 2026 数据实际失效（`meeting_name` 为空、`location` 与 `country_name` 错配），自动推断会落到错误的目录名。传错了也能人工发现：目录名对不上就说一声。
 
 ## 语言
 
 图内文案全走 `f1_i18n.py` 的 `t()`，脚本里不写死可见文字；中英两套都在那一个文件里。优先级：`--lang` > 环境变量 `F1_LANG` > 系统 locale 自动判 > 兜底中文（简中区 zh，HK/TW 及非中文 locale en）。
 
-- 车手中文名列只在中文图里画；英文图落英文站名目录，中文图落中文站名目录，互不覆盖。
+- 车手中文名列只在中文图里画；站名目录统一以中文分站名为准（中英文双目录是历史 bug 遗留，新产物不再产生）。
 - 新增文案两套都要加；缺英文会回落中文并打 stderr 提醒。
 - 改文案只改 `f1_i18n.py`，别在脚本里写死。
 
