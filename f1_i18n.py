@@ -48,6 +48,7 @@ STRINGS = {
         "fp.col_stage": "{stage} 圈速对比",
         "fp.col_tire": "最快圈胎",
         "fp.note": "注：圈速差距相对 P1；右侧色块为该车手最快圈的用胎（红=软/黄=中/白=硬/绿=间/蓝=雨）",
+        "fp.note2": "口径：最快圈与差距取 FIA 官方成绩（session_result），被取消的无效圈已剔除；秒差轴上限 6s，超出部分截断",
         # ---------------- Q 排位圈速差距图 ----------------
         "q.desc": "F1 排位赛圈速差距图（数据先跑 f1_fetch.py）",
         "q.fig": "F1{station}-{stage}-圈速差距图",
@@ -135,6 +136,7 @@ STRINGS = {
         "fp.col_stage": "{stage} lap time",
         "fp.col_tire": "Best-lap tyre",
         "fp.note": "Note: gaps are relative to P1; the chip on the right is the tyre used on that driver's fastest lap (red=soft / yellow=medium / white=hard / green=intermediate / blue=wet)",
+        "fp.note2": "Basis: best lap and gaps from the official FIA classification (session_result); invalidated laps removed. The gap axis is capped at 6s.",
         # ---------------- Qualifying gap chart ----------------
         "q.desc": "F1 qualifying lap-gap chart (run f1_fetch.py first)",
         "q.fig": "F1{station}-{stage}-lap-gap",

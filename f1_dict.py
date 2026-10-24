@@ -181,6 +181,45 @@ def load_json(data_dir, prefix, endpoint):
         return json.load(f)
 
 
+def official_results(data_dir, prefix):
+    """官方成绩（session_result）：车号 -> {best, pos, laps, gap}。
+
+    FIA 官方口径是唯一权威：被取消的圈（越界等）不计入成绩，
+    而 OpenF1 的 /v1/laps 端点没有 deleted 标记，取消的圈仍留在原始数据里，
+    直接取原始最快圈会把已取消的圈算成 P1。这里以官方成绩为准做过滤。
+    """
+    path = os.path.join(data_dir, f"{prefix}_result.json")
+    if not os.path.exists(path):
+        return {}
+    with open(path, encoding="utf-8") as f:
+        res = json.load(f)
+    out = {}
+    for r in res:
+        n = r.get("driver_number")
+        if n is None:
+            continue
+        out[n] = {"best": r.get("duration"), "pos": r.get("position"),
+                  "laps": r.get("number_of_laps"), "gap": r.get("gap_to_leader")}
+    return out
+
+
+def drop_invalid_laps(laps, official_best):
+    """剔除被取消的圈：任何比该车官方最佳圈更快的原始圈都是无效圈。
+
+    official_best: {车号: 官方最佳圈秒数}；为空则不做过滤（没有官方成绩时退化）。
+    """
+    if not official_best:
+        return laps
+    keep = []
+    for L in laps:
+        d = L.get("lap_duration")
+        ob = official_best.get(L.get("driver_number"))
+        if d is not None and ob and d < ob - 0.001:
+            continue
+        keep.append(L)
+    return keep
+
+
 def resolve_session(data_dir, prefix, args=None, lang="zh"):
     """从 data/<prefix>_session.json 推断出图元信息，供三份母版统一取用。
 

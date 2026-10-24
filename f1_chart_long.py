@@ -33,7 +33,8 @@ rcParams["font.sans-serif"] = ["PingFang SC", "Hiragino Sans GB", "Microsoft YaH
 rcParams["axes.unicode_minus"] = False
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from f1_dict import DRIVERS, tire_color, tire_zh, resolve_session, load_json
+from f1_dict import (DRIVERS, tire_color, tire_zh, resolve_session, load_json,
+                    official_results, drop_invalid_laps)
 from f1_i18n import add_lang_arg, init, t, tire_short, is_zh
 
 DEFAULT_SESSION_KEY = 11363   # 无参数时的兜底场次（马德里 FP2）
@@ -93,6 +94,11 @@ for _k in META["missing"]:
 laps = load_json(DATA_DIR, PREFIX, "laps")
 stints = load_json(DATA_DIR, PREFIX, "stints")
 drivers = load_json(DATA_DIR, PREFIX, "drivers")
+
+# 同 f1_chart_fp：剔除被 FIA 取消的无效圈（官方成绩为准，OpenF1 laps 不带 deleted 标记）
+OFFICIAL = official_results(DATA_DIR, PREFIX)
+OFFICIAL_BEST = {n: v["best"] for n, v in OFFICIAL.items() if v.get("best")}
+laps = drop_invalid_laps(laps, OFFICIAL_BEST)
 
 NAME = {d["driver_number"]: (DRIVERS.get(d["driver_number"], {}).get("last")
                              or d.get("last_name") or f"#{d['driver_number']}")

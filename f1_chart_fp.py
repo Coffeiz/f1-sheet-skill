@@ -19,7 +19,8 @@ from PIL import Image
 
 # 车手/分站/胎色共享字典：与 f1_chart_q.py / f1_chart_r.py 同源，改字典改 f1_dict.py 一处
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from f1_dict import DRIVERS, CN, tire_color, resolve_session, load_json, live_drivers
+from f1_dict import (DRIVERS, CN, tire_color, resolve_session, load_json, live_drivers,
+                    official_results, drop_invalid_laps)
 from f1_i18n import add_lang_arg, init, t, tire_short, is_zh
 
 DEFAULT_SESSION_KEY = 11363   # 无参数时的兜底场次（马德里 FP2）；常规用法是传 session_key
@@ -63,6 +64,13 @@ laps = load_json(DATA_DIR, PREFIX, "laps")
 stints = load_json(DATA_DIR, PREFIX, "stints")
 DRV = live_drivers(DATA_DIR, PREFIX)
 
+# 口径：最快圈、排名与差距全部取 FIA 官方成绩（session_result）。
+# OpenF1 的 laps 端点不带 deleted 标记，被 FIA 取消的圈（越界等）仍留在原始数据里，
+# 直接取原始 min 会把已取消的圈画成 P1；laps 只用来取最快圈的用胎和圈数。
+OFFICIAL = official_results(DATA_DIR, PREFIX)
+OFFICIAL_BEST = {n: v["best"] for n, v in OFFICIAL.items() if v.get("best")}
+laps = drop_invalid_laps(laps, OFFICIAL_BEST)
+
 clean = []
 for L in laps:
     if L.get("is_pit_out_lap"): continue
@@ -84,14 +92,39 @@ def tire_for(drv, ln):
         if s["driver_number"] == drv and s["lap_start"] <= ln <= s["lap_end"]: return s.get("compound", "")
     return ""
 
+def official_lap_no(drv, dur):
+    """在原始圈数据里找出与官方最佳圈时间一致的那一圈的圈号（用于取用胎）。"""
+    for L in laps:
+        if L["driver_number"] == drv and L.get("lap_duration") is not None and abs(L["lap_duration"] - dur) < 0.002:
+            return L["lap_number"]
+    return None
+
 rows = []
-for n, b in best.items():
-    d = DRV.get(n, {"last":f"#{n}","team":"Unknown","color":"888888","full":f"#{n}"})
-    rows.append({"num":n,"name":d["last"],"team":d["team"],"color":d["color"],"full":d["full"],"cn":CN.get(n,d["last"]),"best":b,"laps":total_laps.get(n,0),"tire":tire_for(n, best_lap.get(n,0))})
-rows.sort(key=lambda r: r["best"])
-gap0 = rows[0]["best"]
-for r in rows: r["gap"] = r["best"] - gap0
+if OFFICIAL:
+    # 官方口径：位置、最佳圈、差距都用 FIA 成绩
+    for n, v in OFFICIAL.items():
+        if v.get("best") is None:
+            continue
+        d = DRV.get(n, {"last":f"#{n}","team":"Unknown","color":"888888","full":f"#{n}"})
+        ln = official_lap_no(n, v["best"])
+        rows.append({"num":n,"name":d["last"],"team":d["team"],"color":d["color"],"full":d["full"],
+                     "cn":CN.get(n,d["last"]),"best":v["best"],"laps":v.get("laps") or total_laps.get(n,0),
+                     "tire":tire_for(n, ln) if ln else "","pos":v.get("pos"),"ogap":v.get("gap")})
+    rows.sort(key=lambda r: (r["pos"] if r["pos"] else 99))
+    gap0 = rows[0]["best"]
+    for r in rows:
+        r["gap"] = (r["ogap"] if r["ogap"] is not None else r["best"] - gap0)
+else:
+    for n, b in best.items():
+        d = DRV.get(n, {"last":f"#{n}","team":"Unknown","color":"888888","full":f"#{n}"})
+        rows.append({"num":n,"name":d["last"],"team":d["team"],"color":d["color"],"full":d["full"],
+                     "cn":CN.get(n,d["last"]),"best":b,"laps":total_laps.get(n,0),
+                     "tire":tire_for(n, best_lap.get(n,0)),"pos":None})
+    rows.sort(key=lambda r: r["best"])
+    gap0 = rows[0]["best"]
+    for r in rows: r["gap"] = r["best"] - gap0
 gap_max = max(r["gap"] for r in rows) * 1.06
+GAP_AXIS_CAP = 6.0   # 秒差轴上限：单车异常大差距不撑爆整图，超出部分截断
 
 W = 1200; ROW_H = 28; HEADER_Y = 116
 ROW_Y0 = HEADER_Y + 32  # 修复: 再加 4 让 FASTEST 框避表头
@@ -107,15 +140,15 @@ def mmss(v):
     return f"{m}:{s:06.3f}"
 
 p = []
-p.append(f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="910" viewBox="0 0 {W} 910">')
+p.append(f'<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="934" viewBox="0 0 {W} 934">')
 p.append('<defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#151a26"/><stop offset="1" stop-color="#0f131c"/></linearGradient></defs>')
-p.append(f'<rect width="{W}" height="910" rx="14" fill="url(#bg)"/>')
+p.append(f'<rect width="{W}" height="934" rx="14" fill="url(#bg)"/>')
 p.append('<rect x="24" y="26" width="4" height="46" rx="2" fill="#ED1131"/>')
 p.append(f'<text x="40" y="50" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="24" fill="#f4f6fa" font-weight="700">2026 F1 {GP_NAME}</text>')
 sub = t("fp.sub", name=rows[0]["full"], team=rows[0]["team"], n=N)
 p.append(f'<text x="40" y="74" font-family="PingFang SC, Microsoft YaHei, Hiragino Sans GB, sans-serif" font-size="12.5" fill="#a3adc0" font-weight="400">{sub}</text>')
 
-g_top = max(2.0, gap_max)
+g_top = max(2.0, min(gap_max, GAP_AXIS_CAP))
 for i in range(8):
     gv = g_top * i / 7; x = PLOT_X0 + PLOT_W * i / 7
     p.append(f'<line x1="{x:.1f}" y1="{HEADER_Y-12}" x2="{x:.1f}" y2="{ROW_Y0 + N*ROW_H}" stroke="#252c3c" stroke-width="1"/>')
@@ -141,7 +174,7 @@ for i, r in enumerate(rows):
     team_col = hx(r["color"])
     p.append(f'<rect x="{TEAM_BLOCK_X}" y="{y-3}" width="8" height="14" rx="2" fill="{team_col}"/>')
     p.append(f'<text x="{TEAM_X}" y="{y+8.5}" font-family="Segoe UI, Helvetica, Arial, sans-serif" font-size="11.5" fill="#9aa5b8" font-weight="400">{r["team"]}</text>')
-    bw = max(3.0, (r["gap"] / g_top) * PLOT_W); by = y - 2.5
+    bw = max(3.0, min(PLOT_W, (r["gap"] / g_top) * PLOT_W)); by = y - 2.5
     p.append(f'<rect x="{PLOT_X0}" y="{by}" width="{bw:.1f}" height="13" rx="6.5" fill="{team_col}" fill-opacity="0.92"/>')
     if i == 0:
         # P1：FASTEST 徽章 + 完整圈速（分:秒.毫秒）；其余车手只给 gap
@@ -179,6 +212,7 @@ for tn, tc in tires_legend:
     lx += 50
 
 note_y = tire_legend_y + 30
+p.append(f'<text x="30" y="{note_y+18}" font-family="PingFang SC, Microsoft YaHei, Hiragino Sans GB, sans-serif" font-size="10.5" fill="#5b6578" font-weight="400">{t("fp.note2")}</text>')
 p.append(f'<text x="30" y="{note_y}" font-family="PingFang SC, Microsoft YaHei, Hiragino Sans GB, sans-serif" font-size="11" fill="#667186" font-weight="400">{t("fp.note")}</text>')
 p.append(f'<text x="{W-28}" y="{note_y}" font-family="PingFang SC, Microsoft YaHei, Hiragino Sans GB, sans-serif" font-size="10" fill="#4d5666" font-weight="400" text-anchor="end">{t("common.footer", key=SESSION_KEY, date=DATE_LABEL)}</text>')
 p.append('</svg>')
