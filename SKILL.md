@@ -80,6 +80,17 @@ python3 f1_weekend.py --round 16 --dry-run     # 只列计划
 python3 f1_weekend.py --round 16 --refetch     # 已有数据也重抓
 ```
 
+单场 session 全套图（最常用，一条命令）：
+
+```bash
+python3 f1_all.py <session_key>                # 抓数（缺则抓）+ 三张 FP 母版全出
+python3 f1_all.py <session_key> --only fp,traj  # 只跑指定图
+python3 f1_all.py <session_key> --no-fetch      # 只出图不抓数
+python3 f1_all.py <session_key> --dry-run       # 只列计划
+```
+
+`f1_all.py` 自动设内网代理、固定图内语言（默认 zh）、末尾打印产物路径。
+
 ## 一张图 = 一个脚本，别混
 
 | 脚本 | 出什么图 | 回答什么问题 | 用什么数据 |
@@ -89,6 +100,7 @@ python3 f1_weekend.py --round 16 --refetch     # 已有数据也重抓
 | `f1_chart_r.py` | 正赛节奏图 | 正赛节奏、进站分布 | R / Sprint |
 | `f1_chart_long.py` | 长距离速度图 | 长跑谁快 | **只能 FP** |
 | `f1_chart_long_traj.py` | 长距离衰减轨迹图 | 长跑怎么掉速 | **只能 FP** |
+| `f1_all.py` | 单场 session 一条命令出上述三张 FP 图 | 少敲命令 | 任意 FP |
 
 - **圈速排名图**（fp/q/r）：全车手最快圈横向对比、按快慢排名，**不吃干净段门槛**，所以人人都在、FP3 也能出齐。
 - **长距离速度图**：只留合格长跑段，每车每胎取圈数最多那一套，看段尾速度条。
@@ -146,10 +158,10 @@ python3 f1_weekend.py --round 16 --refetch     # 已有数据也重抓
 - **批量出多阶段**：
   ```bash
   for k in 11362 11363 11364; do
-    python3 f1_chart_long.py $k
-    python3 f1_chart_long_traj.py $k
+    python3 f1_all.py $k --only long,traj
   done
   ```
+- **沙盒 locale 是 en，母版自动判定会出英文图**（目录变 `2026-R20-Austin`、文件名变 `lap-gap`）。走 `f1_all.py` 时语言被固定住（默认 zh，`--lang en` 可切）；直接调母版就手动加 `--lang zh`。
 - **换赛季**：改 `f1_dict.py` 的 `YEAR`，并把 `MEETINGS` 换成新赛季排期（站序只计大奖赛，赛前测试不入表）。
 - **代班 / 换号车手**：往 `f1_dict.DRIVERS` 补一条；未收录的车号会退化显示 `#车号`，不报错。
 - **数据源**：OpenF1（免费公开）。抓下来的原始响应原样落盘，不改结构；有疑问先对着 API 回包查，别猜字段。

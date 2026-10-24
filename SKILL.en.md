@@ -80,6 +80,17 @@ python3 f1_weekend.py --round 16 --dry-run     # plan only
 python3 f1_weekend.py --round 16 --refetch     # refetch even if data exists
 ```
 
+Full set for a single session (three FP charts, one command):
+
+```bash
+python3 f1_all.py <session_key>                # fetch if missing + all three FP charts
+python3 f1_all.py <session_key> --only fp,traj  # pick charts
+python3 f1_all.py <session_key> --no-fetch      # charts only
+python3 f1_all.py <session_key> --dry-run       # plan only
+```
+
+`f1_all.py` sets the proxy, pins chart language (default zh) and prints output paths.
+
 ## One chart = one script, don't mix them
 
 | Script | Chart | Answers | Data |

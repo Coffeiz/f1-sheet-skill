@@ -64,6 +64,17 @@ python3 f1_weekend.py --round 16 --only FP1,Q # 只出指定阶段
 python3 f1_weekend.py --round 16 --dry-run    # 预览计划不动手
 ```
 
+一次出齐单场 session 的全套图（三张母版）：
+
+```bash
+python3 f1_all.py 11389                        # 抓数（缺则抓）+ 圈速差距图 + 长距离速度图 + 长距离衰减轨迹图
+python3 f1_all.py 11389 --only fp,traj         # 只跑指定图
+python3 f1_all.py 11389 --no-fetch             # 只出图不抓数
+python3 f1_all.py 11389 --dry-run              # 预览计划不动手
+```
+
+`f1_all.py` 会自动设好内网代理、固定图内语言（默认 zh，沙盒 locale 是 en 时母版会误出英文图），最后打印产物绝对路径。
+
 更多参数见「各脚本」章节。
 
 ## 详细用法

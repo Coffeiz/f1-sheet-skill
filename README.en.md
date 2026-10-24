@@ -64,6 +64,17 @@ python3 f1_weekend.py --round 16 --only FP1,Q # only specified sessions
 python3 f1_weekend.py --round 16 --dry-run    # preview plan without touching anything
 ```
 
+Full set for a single session (three FP charts):
+
+```bash
+python3 f1_all.py 11389                        # fetch if missing + lap-gap + long-run pace + degradation
+python3 f1_all.py 11389 --only fp,traj         # pick charts
+python3 f1_all.py 11389 --no-fetch             # charts only
+python3 f1_all.py 11389 --dry-run              # preview plan
+```
+
+`f1_all.py` sets the proxy, pins the chart language (zh by default) and prints the output paths.
+
 See 「各脚本」for more arguments.
 
 ## Detailed usage
